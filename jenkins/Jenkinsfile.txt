@@ -87,8 +87,38 @@ pipeline {
     }
 
     post {
-        always { echo "Pipeline execution completed!" }
-        failure { echo "Pipeline failed. Check logs for details." }
-        success { echo "Swiggy App deployed successfully!" }
+        always {
+            echo "Pipeline execution completed!"
+        }
+        success {
+            echo "App deployed successfully!"
+            emailext(
+                subject: "✅ Pipeline Success — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <h3>Build Successful</h3>
+                    <p><b>Project:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build:</b> #${env.BUILD_NUMBER}</p>
+                    <p><b>Status:</b> SUCCESS</p>
+                    <p><a href="${env.BUILD_URL}">View Build</a></p>
+                """,
+                to: "${env.NOTIFICATION_EMAIL}",
+                mimeType: 'text/html'
+            )
+        }
+        failure {
+            echo "Pipeline failed. Check logs."
+            emailext(
+                subject: "❌ Pipeline Failed — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <h3>Build Failed</h3>
+                    <p><b>Project:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build:</b> #${env.BUILD_NUMBER}</p>
+                    <p><b>Status:</b> FAILED</p>
+                    <p><a href="${env.BUILD_URL}">View Build Logs</a></p>
+                """,
+                to: "${env.NOTIFICATION_EMAIL}",
+                mimeType: 'text/html'
+            )
+        }
     }
 }
