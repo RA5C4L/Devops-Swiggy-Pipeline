@@ -1,11 +1,10 @@
 resource "aws_security_group" "Project-SG" {
-  name        = "Project-SG"
-  description = "Open 22,443,80,8080,9000"
+  name        = "${var.app_name}-sg"
+  description = "Security group for ${var.app_name} — opens ports for SSH, HTTP, HTTPS, Jenkins, SonarQube and app"
 
-  # Define a single ingress rule to allow traffic on all specified ports
   ingress = [
-    for port in [22, 80, 443, 8080, 9000, 3000] : {
-      description      = "TLS from VPC"
+    for port in [22, 80, 443, 8080, 9000, var.app_port] : {
+      description      = "Allow port ${port}"
       from_port        = port
       to_port          = port
       protocol         = "tcp"
@@ -25,22 +24,22 @@ resource "aws_security_group" "Project-SG" {
   }
 
   tags = {
-    Name = "Project-SG"
+    Name = "${var.app_name}-sg"
   }
 }
 
-
 resource "aws_instance" "web" {
-  ami                    = "ami-02013f5b15758f4d4"
-  instance_type          = "c7i-flex.large"
-  key_name               = "navneet"
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.Project-SG.id]
   user_data              = templatefile("./resource.sh", {})
 
   tags = {
-    Name = "navneet"
+    Name = var.instance_name
   }
+
   root_block_device {
-    volume_size = 30
+    volume_size = var.volume_size
   }
 }
