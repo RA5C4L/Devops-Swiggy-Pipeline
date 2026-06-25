@@ -61,7 +61,7 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker') {
+                    withDockerRegistry(credentialsId: 'docker-creds') {
                         sh """
                           docker build -t ${APP_NAME} .
                           docker tag ${APP_NAME} ${DOCKERHUB_USER}/${APP_NAME}:latest
