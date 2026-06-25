@@ -33,7 +33,7 @@ resource "aws_instance" "web" {
   instance_type          = var.instance_type
   key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.Project-SG.id]
-  user_data              = templatefile("./resource.sh", {})
+  user_data              = file("./resource.sh")
 
   tags = {
     Name = var.instance_name

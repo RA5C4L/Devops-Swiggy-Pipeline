@@ -1,0 +1,82 @@
+jenkins:
+  systemMessage: "Swiggy CI/CD Pipeline — fully configured, ready to use"
+  numExecutors: 2
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "admin"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "DOCKERHUB_USER"
+            value: "navneet117"
+          - key: "APP_NAME"
+            value: "swiggy"
+          - key: "APP_REPO_URL"
+            value: "https://github.com/sandeepallakonda/DevOps-Project-Swiggy-sandeep.git"
+          - key: "NOTIFICATION_EMAIL"
+            value: "viveknavneet117@gmail.com"
+
+tool:
+  jdk:
+    installations:
+      - name: "jdk17"
+        home: "/usr/lib/jvm/temurin-17-jdk-amd64"
+  nodejs:
+    installations:
+      - name: "node20"
+        home: "/usr/local/node20"
+  sonarRunnerInstallation:
+    installations:
+      - name: "sonar-scanner"
+        properties:
+          - installSource:
+              installers:
+                - sonarRunnerInstaller:
+                    id: "5.0.1.3006"
+  dockerTool:
+    installations:
+      - name: "docker"
+        home: "/usr/bin"
+
+unclassified:
+  sonarGlobalConfiguration:
+    buildWrapperEnabled: false
+    installations:
+      - name: "sonar-server"
+        serverUrl: "http://localhost:9000"
+        credentialsId: "sonar-token"
+
+security:
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: false
+
+jobs:
+  - script: |
+      pipelineJob('Swiggy') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  # Update this URL if you fork the repo
+                  url('https://github.com/RA5C4L/Devops-Swiggy-Pipeline.git')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('jenkins/Jenkinsfile')
+          }
+        }
+        triggers {
+          githubPush()
+        }
+      }

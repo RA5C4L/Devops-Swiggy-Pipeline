@@ -1,0 +1,15 @@
+configuration-as-code
+git
+workflow-aggregator
+pipeline-stage-view
+sonar
+nodejs
+docker-workflow
+docker-plugin
+docker-commons
+email-ext
+ws-cleanup
+adoptopenjdk
+job-dsl
+github
+credentials-binding
