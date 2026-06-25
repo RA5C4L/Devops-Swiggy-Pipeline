@@ -1,6 +1,6 @@
 resource "aws_security_group" "Project-SG" {
   name        = "${var.app_name}-sg"
-  description = "Security group for ${var.app_name} — opens ports for SSH, HTTP, HTTPS, Jenkins, SonarQube and app"
+ description = "Security group for ${var.app_name} - opens ports for SSH, HTTP, HTTPS, Jenkins, SonarQube and app"
 
   ingress = [
     for port in [22, 80, 443, 8080, 9000, var.app_port] : {

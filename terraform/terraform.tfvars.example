@@ -1,0 +1,33 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit real values.
+
+# AWS region — check AMI ID below matches the region you pick
+aws_region = "us-east-1"
+
+# EC2 instance type
+# t2.micro     → free tier (limited RAM, slow builds)
+# t3.medium    → light apps
+# c7i-flex.large → heavier CI builds (recommended for this pipeline)
+instance_type = "c7i-flex.large"
+
+# Name of your AWS key pair (without .pem extension)
+key_name = "navneet"
+
+# Root volume size in GB
+volume_size = 30
+
+# Name tag applied to the EC2 instance
+instance_name = "devops-server"
+
+# Port your app runs on (3000 for Node/React, 8080 for Spring Boot)
+app_port = 3000
+
+# Name used for tagging and the security group name
+app_name = "swiggy"
+
+# Ubuntu 22.04 AMI — region-specific, update if you change aws_region
+# us-east-1:      ami-0c7217cdde317cfec
+# us-west-2:      ami-03f65b8614a860c29
+# ap-south-1:     ami-0f5ee92e2d63afc18
+# eu-west-1:      ami-0694d931cee176e7d
+ami_id = "ami-0c7217cdde317cfec"
