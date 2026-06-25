@@ -83,9 +83,11 @@ The project provided deep practical experience in Infrastructure as Code, CI/CD 
 | 8.2 | Server Startup Automation | 15 |
 | 8.3 | CI/CD Pipeline Stages | 16 |
 | 8.4 | Jenkins Configuration as Code | 17 |
-| 9 | Conclusion | 18 |
-| 10 | NBA/IET Mapping | 19 |
-| 11 | References | 22 |
+| 9 | Challenges and Resolutions | 18 |
+| 10 | Future Scope | 21 |
+| 11 | Conclusion | 22 |
+| 12 | NBA/IET Mapping | 23 |
+| 13 | References | 26 |
 
 ---
 
@@ -436,26 +438,102 @@ The result of this implementation is that after `terraform apply` completes, Jen
 
 ---
 
-## 9. Conclusion
+## 9. Challenges and Resolutions
 
-The industrial training at Socedge Technologies resulted in the successful design, implementation, debugging, and full automation of a production-grade DevOps CI/CD pipeline. Starting from an early-stage effort within the team, the pipeline was progressively improved across multiple dimensions — reliability, modularity, security, and automation — until it reached a state where a fresh cloud server could be provisioned and a complete application deployment pipeline made operational with minimal human intervention.
+A defining aspect of this internship was working through genuine engineering obstacles — situations where the expected approach did not work and root cause analysis was required to find a correct solution. The following challenges were encountered and resolved during the project.
 
-The key technical achievements of the project are:
+### 9.1 Jenkins Package Repository — GPG Key Failure
 
-- A fully parameterised Terraform infrastructure definition with no hardcoded values, deployable to any AWS region with a single command
-- An automated server startup script that installs and configures the complete toolchain without manual SSH access
-- A nine-stage declarative Jenkins pipeline covering code quality, security scanning, containerisation, and deployment
-- Jenkins Configuration as Code that reduces a 30-minute manual browser setup to two credential additions
-- Automated SonarQube webhook creation and dual-layer security scanning with Trivy
-- A pipeline with zero hardcoded user-specific values — fully configurable for any user through environment variables and credentials
+**Challenge:** The standard method of installing Jenkins on Ubuntu uses the official Jenkins apt repository. When this approach was attempted on the EC2 instance, the installation failed due to a GPG key verification error — a known issue with how newer Ubuntu versions handle repository signing keys added via legacy methods.
 
-The project provided significant practical exposure to the tools and practices used in modern DevOps engineering. The experience of debugging real installation failures, understanding why certain approaches are more robust than others, and progressively automating manual processes reflects the actual nature of engineering work in the industry.
+**Resolution:** Rather than working around the apt repository issue with workarounds that would make the script fragile, a more reliable approach was adopted: downloading the Jenkins WAR file directly from the official Jenkins distribution server and running it as a standalone Java application managed by systemd. This approach has no dependency on the apt repository and is inherently more stable across Ubuntu versions. The WAR file is the same binary that the apt package installs — the only difference is how it is obtained and managed.
 
-The pipeline developed during this internship is a working, reproducible system that demonstrates the full DevOps lifecycle — from infrastructure as code to automated deployment — and is documented for independent replication by others.
+**Learning:** Package repository installation methods can be brittle in automated scripts. Direct binary downloads from official sources, while less "conventional," are often more reliable in unattended boot scripts where interactive error handling is not possible.
+
+### 9.2 Terraform Template Syntax Conflict with Shell Script
+
+**Challenge:** The initial configuration used `templatefile("./resource.sh", {})` in Terraform's `main.tf` to attach the startup script to the EC2 instance. When the script was updated to contain heredoc blocks (used to write configuration files from within the shell script), Terraform began failing with interpolation errors. The heredoc content contained `${...}` patterns — such as `${VERSION_CODENAME}` in shell variable expansions — which Terraform's template engine was incorrectly interpreting as Terraform interpolation syntax.
+
+**Resolution:** Changed `templatefile()` to `file()` in `main.tf`. The `file()` function reads the script as a raw string without any template processing, passing it to the EC2 instance exactly as written. Since no Terraform variable interpolation was actually needed inside the script, `templatefile()` was never the right choice.
+
+**Learning:** `templatefile()` and `file()` are not interchangeable. `templatefile()` should only be used when Terraform variables need to be injected into the file content. Using it unnecessarily introduces a hidden fragility — any `${...}` in the file will be treated as a template variable, regardless of intent.
+
+### 9.3 SonarQube Webhook Unreachable from Docker Container
+
+**Challenge:** SonarQube was configured with a webhook pointing to Jenkins at `http://localhost:8080/sonarqube-webhook/` so that it could notify Jenkins when quality gate analysis was complete. The pipeline was getting stuck at the Quality Gate stage, eventually timing out and aborting. Debugging revealed that the SonarQube task was completing on the SonarQube side, but the webhook notification was never reaching Jenkins.
+
+**Root Cause:** SonarQube runs inside a Docker container using the default Docker bridge network. From within a Docker container, `localhost` resolves to the container's own loopback interface — not the host machine where Jenkins is running. The webhook was therefore being sent to a non-existent listener inside the SonarQube container itself.
+
+**Resolution:** Changed the webhook URL from `http://localhost:8080/sonarqube-webhook/` to `http://172.17.0.1:8080/sonarqube-webhook/`. The IP address `172.17.0.1` is the Docker bridge gateway — a virtual network interface that is consistently present on any machine running Docker with the default bridge network, and which always routes to the host from within a container. This change was applied both in the automated webhook creation in `resource.sh` and documented for manual setup.
+
+**Learning:** Docker bridge networking is a frequently misunderstood aspect of containerised services. `localhost` inside a container is not the same as `localhost` on the host, and any service running in Docker that needs to communicate with a host-level service must use the Docker gateway IP or a host network mode.
+
+### 9.4 Quality Gate Timeout Calibration
+
+**Challenge:** Even after resolving the webhook networking issue, the Quality Gate stage was still timing out on the first pipeline run. The SonarQube analysis stage completed successfully and uploaded the analysis report, but the Jenkins pipeline aborted before the quality gate result was received, reporting that the SonarQube background task status was `IN_PROGRESS` at the time of timeout.
+
+**Root Cause:** The SonarQube Compute Engine — the background worker that processes uploaded analysis reports and evaluates quality gates — was slower than the pipeline's two-minute timeout allowed for. On a resource-constrained server running both Jenkins and SonarQube simultaneously, the background processing took longer than on a dedicated server.
+
+**Resolution:** Increased the quality gate timeout in the Jenkinsfile from two minutes to five minutes. This provided sufficient margin for SonarQube's background processing to complete under the load conditions of the shared server.
+
+**Learning:** Timeout values in CI/CD pipelines are not one-size-fits-all. They must be calibrated to the actual performance characteristics of the environment — particularly when multiple memory-intensive services share a single server.
+
+### 9.5 Jenkins Docker Tool Path Misconfiguration in JCasC
+
+**Challenge:** After implementing Jenkins Configuration as Code, the Docker Build and Push stage of the pipeline failed with the error: `Cannot run program "/usr/bin/bin/docker": No such file or directory`. The Docker binary exists at `/usr/bin/docker` on the system, so the path was clearly being constructed incorrectly.
+
+**Root Cause:** The JCasC configuration set the Docker tool installation `home` to `/usr/bin`. The Jenkins Docker plugin constructs the binary path by appending `/bin/docker` to the configured `home` directory. This resulted in `/usr/bin` + `/bin/docker` = `/usr/bin/bin/docker` — a path that does not exist.
+
+**Resolution:** Rather than adjusting the `home` path (which would require a Jenkins restart to take effect), the `toolName` parameter was removed entirely from the `withDockerRegistry` call in the Jenkinsfile. Without an explicit `toolName`, Jenkins resolves the Docker binary from the system `PATH` environment variable, which correctly locates `/usr/bin/docker`. This approach is also simpler and more portable — it does not depend on a specific tool installation configuration in Jenkins.
+
+**Learning:** When configuring tools via JCasC, the `home` parameter represents the root of the tool installation, not the directory containing the binary. Jenkins appends the conventional binary path (`/bin/<tool>`) to the `home` value. Understanding this convention is critical for correct tool configuration. Additionally, using the system PATH where possible reduces dependency on Jenkins-specific tool configuration.
+
+### 9.6 JCasC Configuration Caching After Reload
+
+**Challenge:** When the Docker tool `home` path was corrected in `jenkins.yaml` and the JCasC configuration was reloaded via the Jenkins UI, the pipeline continued to use the old incorrect path. Changing the value directly in the Jenkins UI (Global Tool Configuration) and saving also had no effect on subsequent builds.
+
+**Root Cause:** JCasC periodically reloads its configuration from the YAML file on disk. If the YAML file on the server had not been updated (only the file in the local repository had been changed and pushed), JCasC would reload the old configuration and overwrite the UI change. The fix in the local file had not been propagated to the server's `/var/lib/jenkins/casc_configs/jenkins.yaml`.
+
+**Resolution:** The YAML file on the live server was updated directly via SSH using `sed`, and the JCasC configuration was reloaded. For subsequent deployments, the fix was committed to the repository so that the corrected configuration is written to the server by `resource.sh` on first boot.
+
+**Learning:** JCasC is authoritative — it will overwrite manual UI changes on reload. This is by design (it ensures the server always matches the declared configuration), but it means that fixes must be applied to the source YAML file, not just the UI. Understanding the authority model of configuration-as-code tools is essential when debugging live configuration issues.
 
 ---
 
-## 10. NBA/IET Mapping
+## 10. Future Scope
+
+The pipeline implemented during this internship delivers a fully functional end-to-end CI/CD workflow. Several enhancements were identified during the project that were deferred as out-of-scope for the internship period but represent natural next steps for a production-grade system.
+
+**Email Notifications:** The pipeline's post-build notification stage was designed to send build status emails via the Jenkins Email Extension plugin. Integration with an SMTP server (such as Gmail with App Password authentication) would allow developers to receive immediate alerts on build success or failure without checking the Jenkins dashboard. This feature was prototyped but removed from the final Jenkinsfile to keep the pipeline free of SMTP configuration dependencies — the `email-ext` plugin remains installed and the notification logic can be re-enabled by configuring the SMTP server credentials in Jenkins.
+
+**GitHub Webhook for Auto-Triggering:** The pipeline job is configured with a `githubPush()` trigger in Jenkins, which is the Jenkins-side requirement for automatic triggering on code push. The missing piece is the corresponding webhook on the GitHub repository — a callback URL pointing to `http://<jenkins-ip>/github-webhook/` that GitHub fires on every push. This was not implemented because the Jenkins server IP changes on every `terraform apply`, making a static webhook configuration impractical. A production deployment would resolve this by assigning an AWS Elastic IP to the instance, making the Jenkins URL permanent and allowing the GitHub webhook to be configured once and reused across redeployments.
+
+**Remote Terraform State:** The current setup uses a local Terraform state file. In a team environment where multiple engineers run `terraform apply` or `terraform destroy`, a shared remote state backend (AWS S3 for storage with DynamoDB for state locking) is essential to prevent state corruption from concurrent operations. Implementing remote state would make the infrastructure management safe for multi-engineer teams.
+
+**SonarQube Quality Gate Customisation:** The current setup uses SonarQube's default "Sonar way" quality gate. For a production project, custom quality gates tailored to the team's standards — specific thresholds for code coverage, maximum allowed vulnerabilities by severity, and duplication limits — would make the gate more meaningful and aligned with project requirements.
+
+---
+
+## 11. Conclusion
+
+The industrial training at Socedge Technologies resulted in the successful design, implementation, debugging, and full automation of a production-grade DevOps CI/CD pipeline on AWS. The pipeline was verified end-to-end — a fresh EC2 instance was provisioned from scratch using Terraform, all software installed automatically via the startup script, Jenkins came up fully configured via JCasC, and all nine pipeline stages completed successfully in a single run, culminating in a live container deployment of the application.
+
+The key technical achievements of the project are:
+
+- A fully parameterised Terraform infrastructure definition with no hardcoded values, deployable to any AWS region with a single `terraform apply` command
+- An automated server startup script that installs the complete toolchain — Java, NodeJS, Docker, SonarQube, Jenkins, Trivy — without any manual SSH access
+- A nine-stage declarative Jenkins pipeline covering code quality, dependency installation, security scanning at two levels, containerisation, and live deployment
+- Jenkins Configuration as Code that reduces a 30-minute manual browser setup to two credential additions
+- Correct Docker bridge gateway configuration ensuring SonarQube can notify Jenkins across Docker network boundaries
+- A pipeline with zero hardcoded user-specific values — fully configurable for any user through environment variables and credentials
+
+Beyond the implementation itself, the project provided deep practical exposure to the kind of engineering work that defines real DevOps roles — diagnosing failures that do not produce obvious error messages, understanding system boundaries such as Docker container networking, and making targeted fixes that improve the reliability of the system for all future users. Each challenge encountered was analysed at the root cause level rather than patched superficially, resulting in a system that is robust, reproducible, and well-understood.
+
+The pipeline is a working, documented, and version-controlled system that any engineer can bring up independently — a standard that reflects production DevOps practice.
+
+---
+
+## 12. NBA/IET Mapping
 
 **NBA — PROGRAM OUTCOMES (PO) & PROGRAM SPECIFIC OUTCOMES (PSO)**
 
@@ -532,7 +610,7 @@ Declaration: Through this Industrial Training, I have accomplished the above sta
 
 ---
 
-## 11. References
+## 12. References
 
 [1] HashiCorp, "Terraform Documentation," [Online]. Available: https://developer.hashicorp.com/terraform/docs (last referenced: June 2026)
 
