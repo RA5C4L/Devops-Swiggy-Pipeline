@@ -130,7 +130,7 @@ tool:
   dockerTool:
     installations:
       - name: "docker"
-        home: "/usr/bin"
+        home: "/usr"
 
 unclassified:
   sonarGlobalConfiguration:
@@ -204,7 +204,7 @@ until curl -sf http://localhost:9000/api/system/status 2>/dev/null | python3 -c 
   sleep 15
 done
 curl -s -u admin:admin -X POST "http://localhost:9000/api/webhooks/create" \
-  -d "name=jenkins&url=http://localhost:8080/sonarqube-webhook/" || true
+  -d "name=jenkins&url=http://172.17.0.1:8080/sonarqube-webhook/" || true
 echo "SonarQube webhook created"
 
 echo "========== Setup Complete =========="
