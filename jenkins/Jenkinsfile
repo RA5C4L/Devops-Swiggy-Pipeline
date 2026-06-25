@@ -7,7 +7,10 @@ pipeline {
     }
 
     environment {
-        SCANNER_HOME = tool 'sonar-scanner'
+        SCANNER_HOME    = tool 'sonar-scanner'
+        DOCKERHUB_USER  = "${env.DOCKERHUB_USER}"
+        APP_REPO_URL    = "${env.APP_REPO_URL}"
+        APP_NAME        = "${env.APP_NAME}"
     }
 
     stages {
@@ -17,7 +20,7 @@ pipeline {
 
         stage('Checkout from Git') {
             steps {
-                git branch: 'master', url: 'https://github.com/sandeepallakonda/DevOps-Project-Swiggy-sandeep.git'
+                git branch: 'master', url: "${APP_REPO_URL}"
             }
         }
 
@@ -60,9 +63,9 @@ pipeline {
                 script {
                     withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker') {
                         sh """
-                          docker build -t swiggy .
-                          docker tag swiggy navneet117/swiggy:latest
-                          docker push navneet117/swiggy:latest
+                          docker build -t ${APP_NAME} .
+                          docker tag ${APP_NAME} ${DOCKERHUB_USER}/${APP_NAME}:latest
+                          docker push ${DOCKERHUB_USER}/${APP_NAME}:latest
                         """
                     }
                 }
@@ -71,17 +74,17 @@ pipeline {
 
         stage('Trivy Image Scan') {
             steps {
-                sh "trivy image navneet117/swiggy:latest --exit-code 0 --severity HIGH,CRITICAL -f table -o trivy-image-report.txt"
+                sh "trivy image ${DOCKERHUB_USER}/${APP_NAME}:latest --exit-code 0 --severity HIGH,CRITICAL -f table -o trivy-image-report.txt"
                 archiveArtifacts artifacts: 'trivy-image-report.txt', allowEmptyArchive: true
             }
         }
 
         stage('Deploy to Container') {
             steps {
-                sh '''
-                  docker rm -f swiggy || true
-                  docker run -d --name swiggy -p 3000:3000 navneet117/swiggy:latest
-                '''
+                sh """
+                  docker rm -f ${APP_NAME} || true
+                  docker run -d --name ${APP_NAME} -p 3000:3000 ${DOCKERHUB_USER}/${APP_NAME}:latest
+                """
             }
         }
     }
