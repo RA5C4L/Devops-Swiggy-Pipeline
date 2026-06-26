@@ -7,7 +7,7 @@ if (-not $ip) {
 
 $url = "http://$ip`:8080/login"
 Write-Host "Waiting for Jenkins at $url ..."
-Write-Host "(This takes 8-10 minutes. Checking every 30 seconds)"
+Write-Host "(This takes 8-10 minutes. Checking every 15 seconds)"
 Write-Host ""
 
 $attempt = 1
@@ -24,5 +24,5 @@ while ($true) {
         Write-Host "[$attempt] Not ready yet... ($([int]($attempt * 0.5)) min elapsed)"
     }
     $attempt++
-    Start-Sleep -Seconds 30
+    Start-Sleep -Seconds 15
 }

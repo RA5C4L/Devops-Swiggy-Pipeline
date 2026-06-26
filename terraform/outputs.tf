@@ -34,5 +34,5 @@ output "ssh_command" {
 # ========== Next Step ==========
 output "next_step" {
   description = "Run this from the repo root to know exactly when Jenkins is ready"
-  value       = "cd .. && .\\wait-for-jenkins.ps1"
+  value       = "cd ..; .\\wait-for-jenkins.ps1"
 }
