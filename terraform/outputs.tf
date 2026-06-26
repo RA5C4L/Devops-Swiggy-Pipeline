@@ -30,3 +30,9 @@ output "ssh_command" {
   description = "SSH command to connect to your instance"
   value       = "ssh -i C:/Users/vivek/OneDrive/Desktop/${var.key_name}.pem ubuntu@${aws_instance.web.public_ip}"
 }
+
+# ========== Next Step ==========
+output "next_step" {
+  description = "Run this from the repo root to know exactly when Jenkins is ready"
+  value       = "cd .. && .\\wait-for-jenkins.ps1"
+}
