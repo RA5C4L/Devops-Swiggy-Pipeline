@@ -27,6 +27,6 @@ output "app_url" {
 
 # ========== SSH Command ==========
 output "ssh_command" {
-  description = "SSH command — replace /path/to/ with the full path to your .pem file"
-  value       = "ssh -i /path/to/${var.key_name}.pem ubuntu@${aws_instance.web.public_ip}"
+  description = "SSH command to connect to your instance"
+  value       = "ssh -i \"C:/Users/vivek/OneDrive/Desktop/${var.key_name}.pem\" ubuntu@${aws_instance.web.public_ip}"
 }
